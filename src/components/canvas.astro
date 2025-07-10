@@ -2,4 +2,90 @@
 
 ---
 
-<canvas></canvas>
+<canvas class="threejs fixed top-0 left-0 w-screen h-screen block"></canvas>
+
+<script>
+    import { Color, DirectionalLight, MathUtils, Mesh, PlaneGeometry, ShaderMaterial, Vector3 } from "three";
+    import { World } from "../lib/World";
+    import fragment from "../shaders/spheres/fragment.glsl?raw";
+    import vertex from "../shaders/spheres/vertex.glsl?raw";
+
+    const canvas = document.querySelector<HTMLCanvasElement>('.threejs');
+    if (!canvas) throw new Error("canvas not found");
+
+    const world = new World(canvas);
+    const scene = world.getScene;
+    const camera = world.getCamera;
+    const renderer = world.getRenderer;
+
+    const fov = 75;
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+
+    const backgroundColor = new Color(0x3399ee);
+    const light = new DirectionalLight(0xffffff, 1)
+    light.position.set(0, 0, 1)
+    scene.add(light)
+
+    const geometry = new PlaneGeometry()
+    const material = new ShaderMaterial({
+        vertexShader: vertex,
+        fragmentShader: fragment,
+        uniforms: {
+            u_eps: { value: 0.001 },
+            u_maxDis: { value: 1000 },
+            u_maxSteps: { value: 100 },
+
+            u_clearColor: { value: backgroundColor },
+        
+            u_camPos: { value: camera.position },
+            u_camToWorldMat: { value: camera.matrixWorld },
+            u_camInvProjMat: { value: camera.projectionMatrixInverse },
+        
+            u_lightDir: { value: light.position },
+            u_lightColor: { value: light.color },
+        
+            u_diffIntensity: { value: 0.5 },
+            u_specIntensity: { value: 3 },
+            u_ambientIntensity: { value: 0.15 },
+            u_shininess: { value: 16 },
+        
+            u_time: { value: 0 },
+        }
+    })
+    const rayMarchPlane = new Mesh(geometry, material)
+
+    const nearPlaneWidth = camera.near * Math.tan(MathUtils.degToRad(camera.fov / 2)) * camera.aspect * 2
+    const nearPlaneHeight = nearPlaneWidth / camera.aspect
+    rayMarchPlane.scale.set(nearPlaneWidth, nearPlaneHeight, 1)
+
+    scene.add(rayMarchPlane)
+
+    let cameraForwardPos = new Vector3(0,0,-1)
+    const VECTOR3ZERO = new Vector3(0,0,0)
+    let time = Date.now()
+    world.setOnAnimate(() => {
+        cameraForwardPos = camera.position.clone().add(camera.getWorldDirection(VECTOR3ZERO).multiplyScalar(camera.near));
+        rayMarchPlane.position.copy(cameraForwardPos);
+        rayMarchPlane.rotation.copy(camera.rotation);
+
+        material.uniforms.u_time.value = (Date.now() - time) / 1000
+
+        if (material.uniforms)
+            material.uniforms.u_time.value = (Date.now() - time) / 1000
+    })
+
+    world.setOnResize(() => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+    
+        const nearPlaneWidth = camera.near * Math.tan(MathUtils.degToRad(camera.fov / 2)) * camera.aspect * 2;
+        const nearPlaneHeight = nearPlaneWidth / camera.aspect;
+        rayMarchPlane.scale.set(nearPlaneWidth, nearPlaneHeight, 1);
+    
+        if (renderer) renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    world.animate();
+
+</script>
