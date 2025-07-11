@@ -21,10 +21,11 @@ uniform float u_ambientIntensity;
 uniform float u_shininess;
 
 uniform float u_time;
+uniform vec2 u_mouse;
 
 float smin(float a, float b, float k) { // smooth min function
-  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
-  return mix(b, a, h) - k * h * (1.0 - h);
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
 }
 
 float cubeSDF(vec3 p, vec3 b) {
@@ -32,31 +33,58 @@ float cubeSDF(vec3 p, vec3 b) {
     return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
 }
 
-vec3 repeat(vec3 p, vec3 c) {
-    return mod(p + c * 0.5, c) - c * 0.5;
+mat3 rotationX(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(
+        1.0, 0.0, 0.0,
+        0.0, c, -s,
+        0.0, s,  c
+    );
+}
+
+mat3 rotationY(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(
+        c, 0.0, s,
+        0.0, 1.0, 0.0,
+        -s, 0.0, c
+    );
 }
 
 float scene(vec3 p) {
-  // repeat the scene
-  vec3 c = vec3(10.0); // size of the repeating scene
-  vec3 rp = repeat(p, c);
 
-  vec3 cubeSize = vec3(0.5);
+    // distance to cube
+    vec3 cubePos = p;
+    cubePos.y -= sin(u_time * 0.493) * 0.212;
+    cubePos.x += sin(u_time * 0.651) * 0.175;
 
-  // distance to cube
-  float cubeDis = cubeSDF(rp, cubeSize);
+     // Rotation du cube
+    float angleX = u_time * 0.05;
+    float angleY = u_time * 0.15;
 
-  // distance to sphere 2
-  float sphereDis = distance(rp, vec3(sin(u_time) * atan(u_time), cos(u_time) * sin(u_time), -sin(u_time))) - 0.6;
+    mat3 rot = rotationY(angleY) * rotationX(angleX);
+    vec3 rotatedP = rot * p;
 
-  float smoothMerge = smin(cubeDis, sphereDis, 0.6);
+    vec3 cubeSize = vec3(0.5);
+    float cubeDis = cubeSDF(rotatedP, cubeSize) - 0.1;
 
-  // return the minimum distance between the two spheres smoothed by 0.5
-  return smoothMerge;
+    // distance to sphere
+    //   float sphereDis = distance(p, vec3(sin(u_time) * atan(u_time), cos(u_time) * sin(u_time), -sin(u_time))) - 0.6;
+    vec3 spherePos = vec3(
+        (u_mouse.x - 0.5) * 4.0,
+        (0.5 - u_mouse.y) * 4.0,
+        0.2
+    );
+    float sphereDis = distance(p, spherePos) - 0.2;
+    float smoothMerge = smin(cubeDis, sphereDis, 0.6);
+
+    // return the minimum distance between the two spheres smoothed by 0.5
+    return smoothMerge;
 }
 
-float rayMarch(vec3 ro, vec3 rd)
-{
+float rayMarch(vec3 ro, vec3 rd) {
     float d = 0.; // total distance travelled
     float cd; // current scene distance
     vec3 p; // current position of ray
@@ -69,23 +97,23 @@ float rayMarch(vec3 ro, vec3 rd)
         if (cd < u_eps || d >= u_maxDis) break;
 
         // otherwise, add new scene distance to total distance
-        d += cd;
+            d += cd;
     }
 
     return d; // finally, return scene distance
 }
 
 vec3 sceneCol(vec3 p) {
-  float sphereDis = distance(p, vec3(sin(u_time) * atan(u_time), cos(u_time) * sin(u_time), -sin(u_time))) - 0.5;
-  float cubeDis = cubeSDF(p, vec3(0.5));
+    float sphereDis = distance(p, vec3(sin(u_time) * atan(u_time), cos(u_time) * sin(u_time), -sin(u_time))) - 0.5;
+    float cubeDis = cubeSDF(p, vec3(0.5));
 
-  vec3 colorCube = vec3(0.8, 0.2, 0.2);
-  vec3 colorSphere = vec3(0.2, 0.2, 0.8); 
+    vec3 colorCube = vec3(0.8, 0.2, 0.2);
+    vec3 colorSphere = vec3(0.2, 0.2, 0.8); 
 
-  // Smoothly blend colors based on the distance to sphere2 and cube
-  float h = clamp(0.5 + 0.5 * (cubeDis - sphereDis) / 0.5, 0.0, 1.0);
+    // Smoothly blend colors based on the distance to sphere2 and cube
+    float h = clamp(0.5 + 0.5 * (cubeDis - sphereDis) / 0.5, 0.0, 1.0);
 
-  return mix(colorCube, colorSphere, h);
+    return mix(colorCube, colorSphere, h);
 }
 
 vec3 normal(vec3 p) {
@@ -98,8 +126,7 @@ vec3 normal(vec3 p) {
     return normalize(n);
 }
 
-void main()
-{
+void main() {
     // Get UV from vertex shader
     vec2 uv = vUv.xy;
 
@@ -108,13 +135,13 @@ void main()
     vec3 rd = (u_camInvProjMat * vec4(uv*2.-1., 0, 1)).xyz;
     rd = (u_camToWorldMat * vec4(rd, 0)).xyz;
     rd = normalize(rd);
-    
+
     // Ray marching and find total distance travelled
     float disTravelled = rayMarch(ro, rd); // use normalized ray
 
     // Find the hit position
     vec3 hp = ro + disTravelled * rd;
-    
+
     // Get normal of hit point
     vec3 n = normal(hp);
 

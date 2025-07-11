@@ -5,7 +5,7 @@
 <canvas class="threejs fixed top-0 left-0 w-screen h-screen block"></canvas>
 
 <script>
-    import { Color, DirectionalLight, MathUtils, Mesh, PlaneGeometry, ShaderMaterial, Vector3 } from "three";
+    import { Color, DirectionalLight, MathUtils, Mesh, PlaneGeometry, ShaderMaterial, Vector2, Vector3 } from "three";
     import { World } from "../lib/World";
     import fragment from "../shaders/spheres/fragment.glsl?raw";
     import vertex from "../shaders/spheres/vertex.glsl?raw";
@@ -51,6 +51,7 @@
             u_shininess: { value: 16 },
         
             u_time: { value: 0 },
+            u_mouse: { value: new Vector2(0.5, 0.5) }
         }
     })
     const rayMarchPlane = new Mesh(geometry, material)
@@ -71,8 +72,9 @@
 
         material.uniforms.u_time.value = (Date.now() - time) / 1000
 
-        if (material.uniforms)
+        if (material.uniforms) {
             material.uniforms.u_time.value = (Date.now() - time) / 1000
+        }
     })
 
     world.setOnResize(() => {
@@ -87,5 +89,13 @@
     });
 
     world.animate();
+
+    window.addEventListener('mousemove', (e) => {
+        const x = e.clientX / window.innerWidth;
+        const y = e.clientY / innerHeight;
+        if (material.uniforms) {
+            material.uniforms.u_mouse.value.set(x, y);
+        }
+    })
 
 </script>
